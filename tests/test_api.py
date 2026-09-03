@@ -24,3 +24,7 @@ def test_unknown_criticality_is_rejected(client):
 def test_create_requires_a_name(client):
     response = client.post("/assets", json={"criticality": "high"})
     assert response.status_code == 400
+
+
+def test_unsortable_column_is_rejected(client):
+    assert client.get("/assets?sort=; DROP TABLE assets").status_code == 400

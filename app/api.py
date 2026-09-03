@@ -16,8 +16,15 @@ def healthz():
 
 @app.get("/assets")
 def list_assets():
-    limit = min(request.args.get("limit", default=50, type=int), 200)
-    return jsonify(assets=repository.list_assets(limit=limit))
+    limit = min(max(request.args.get("limit", default=50, type=int), 1), 200)
+    offset = max(request.args.get("offset", default=0, type=int), 0)
+    sort = request.args.get("sort", "updated")
+    if sort not in repository.SORTABLE:
+        return jsonify(error="unsortable column"), 400
+    return jsonify(
+        assets=repository.list_assets(limit=limit, offset=offset, sort=sort),
+        total=repository.count_assets(),
+    )
 
 
 @app.get("/assets/<int:asset_id>")
