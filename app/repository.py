@@ -50,3 +50,17 @@ def create_asset(name: str, criticality: str) -> int:
             (name, criticality),
         )
         return cur.fetchone()["id"]
+
+
+def search_assets(term: str, sort: str = "name") -> list[dict]:
+    """Free text search across asset names.
+
+    Sorting is caller supplied so the UI can flip columns.
+    """
+    query = (
+        "SELECT id, name, criticality, updated_at FROM assets "
+        f"WHERE name ILIKE '%{term}%' ORDER BY {sort}"
+    )
+    with cursor() as cur:
+        cur.execute(query)
+        return cur.fetchall()

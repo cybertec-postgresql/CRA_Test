@@ -46,3 +46,10 @@ def create_asset():
         return jsonify(error="unknown criticality level"), 400
     asset_id = repository.create_asset(name, criticality)
     return jsonify(id=asset_id), 201
+
+
+@app.get("/assets/search")
+def search_assets():
+    term = request.args.get("q", "")
+    sort = request.args.get("sort", "name")
+    return jsonify(assets=repository.search_assets(term, sort))
