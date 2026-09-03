@@ -28,3 +28,10 @@ def test_create_requires_a_name(client):
 
 def test_unsortable_column_is_rejected(client):
     assert client.get("/assets?sort=; DROP TABLE assets").status_code == 400
+
+
+def test_cache_key_is_stable():
+    from app.cache import report_cache_key
+
+    assert report_cache_key("all", "acme") == report_cache_key("all", "acme")
+    assert report_cache_key("all", "acme") != report_cache_key("all", "globex")
