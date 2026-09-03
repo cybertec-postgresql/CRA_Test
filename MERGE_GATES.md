@@ -126,6 +126,92 @@ For the whole organisation, post the same body to
 Note that the Team plan has **no Evaluate (dry run) mode**, so roll out by
 targeting a few repositories through a custom property before widening.
 
+## Steps: adding the approver gate
+
+Fifteen minutes, including the tests. You need repository admin.
+
+### 1. Create the ruleset
+
+Repository **Settings**, **Rules**, **Rulesets**, **New ruleset**,
+**New branch ruleset**.
+
+- **Name:** `Default branch: scan and review`
+- **Enforcement status:** `Active`
+- **Bypass list:** leave empty. Add nothing, not even yourself. An
+  administrator who can bypass silently is not covered by the control, and that
+  is the first thing an auditor asks about.
+- **Target branches:** Add target, **Include default branch**.
+
+### 2. Turn on the review requirement
+
+Tick **Require a pull request before merging**, then set:
+
+| Field | Value | Why |
+|---|---|---|
+| Required approvals | `1` | GitHub already forbids approving your own pull request, so 1 means another person |
+| Dismiss stale pull request approvals when new commits are pushed | **on** | Without this an approval carries over to code nobody reviewed |
+| Require approval of the most recent reviewable push | **on** | Stops someone approving commits they pushed themselves |
+| Require review from Code Owners | off for now | Turn on once a `CODEOWNERS` file exists |
+| Require conversation resolution before merging | optional | Blocks merging over unresolved review comments |
+
+### 3. Turn on the scan requirement
+
+Tick **Require status checks to pass**, then:
+
+1. Click **Add checks** and search for `scan`. It only appears if it has run at
+   least once on this repository, which it has.
+2. Set the source to **GitHub Actions**, not "any source". This is the pinning
+   described above, and it is the difference between a gate and a gate with the
+   key left in it.
+3. Tick **Require branches to be up to date before merging**.
+
+### 4. Block the escape routes
+
+Still in the same ruleset:
+
+- **Block force pushes**, so history cannot be rewritten under an approval.
+- **Restrict deletions**, so the branch cannot be deleted and recreated.
+
+**Create**.
+
+### 5. Prove it works
+
+Do not skip this. The four tests are in the next section. A ruleset that has
+never refused anything has never been tested.
+
+### Doing it through the API instead
+
+```sh
+curl -X POST \
+  -H "Accept: application/vnd.github+json" \
+  -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/cybertec-postgresql/CRA_Test/rulesets \
+  -d @.github/rulesets/default-branch.json
+```
+
+Confirm afterwards, and check that `bypass_actors` really is empty:
+
+```sh
+curl -sS -H "Authorization: Bearer $GITHUB_TOKEN" \
+  https://api.github.com/repos/cybertec-postgresql/CRA_Test/rulesets \
+  | python3 -m json.tool
+```
+
+### Rolling it to the organisation
+
+Same body, posted to `/orgs/{org}/rulesets`, with the target set to all
+repositories or a subset selected by repository custom property. Organisation
+rulesets are included in the Team plan.
+
+The Team plan has **no Evaluate (dry run) mode**, so there is no way to see what
+a ruleset would have blocked before it blocks it. Roll out to a handful of
+repositories by custom property first, then widen.
+
+Note that a required check named `scan` only exists in repositories that run a
+job with that name. In a repository without the workflow, the check never
+reports and every pull request blocks forever. Roll out the workflow first, the
+ruleset second.
+
 ## Test it before you trust it
 
 A protection rule nobody has tried to bypass has never been tested. Confirm all
