@@ -1,3 +1,10 @@
+"""DELIBERATELY VULNERABLE TEST FIXTURE. DO NOT COPY, DO NOT DEPLOY.
+
+Exists solely so the Semgrep pull request gate has known defects to catch.
+Every issue below is planted on purpose and is expected to fail CI.
+See README.md for the control test this file belongs to.
+"""
+
 import os
 import subprocess
 import hashlib
