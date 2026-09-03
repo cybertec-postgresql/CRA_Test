@@ -22,6 +22,7 @@ jobs:
           semgrep scan \
             --config=p/default \
             --config=p/python \
+            --config=.semgrep/ \
             --metrics=off \
             --sarif -o semgrep.sarif \
             .
@@ -37,6 +38,7 @@ jobs:
           semgrep scan \
             --config=p/default \
             --config=p/python \
+            --config=.semgrep/ \
             --metrics=off \
             --error \
             .

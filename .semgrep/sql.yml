@@ -1,0 +1,23 @@
+rules:
+  - id: formatted-sql-into-execute
+    mode: taint
+    languages: [python]
+    severity: ERROR
+    message: >-
+      SQL is built with string formatting and passed to execute(). Interpolated
+      values are not escaped, so a caller controlled value becomes SQL. Pass
+      values as bound parameters, cur.execute(sql, (value,)), and resolve
+      identifiers such as sort columns through an allow list.
+    metadata:
+      cwe: "CWE-89: Improper Neutralization of Special Elements used in an SQL Command"
+      owasp: "A03:2021 - Injection"
+      confidence: HIGH
+    pattern-sources:
+      - pattern-either:
+          - pattern: f"..."
+          - pattern: "\"...\" % $X"
+          - pattern: "\"...\".format(...)"
+    pattern-sinks:
+      - patterns:
+          - pattern: $CUR.execute($QUERY, ...)
+          - focus-metavariable: $QUERY
