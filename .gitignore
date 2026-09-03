@@ -1,2 +1,4 @@
-/semgrep.sarif
-/semgrep.json
+# scan artefacts, kept out of the repo
+*.sarif
+evidence.json
+findings_table.json

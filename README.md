@@ -1,13 +1,12 @@
-# semgrep-pr-gate-demo
+# CRA_Test
 
-Demonstrates Semgrep Community Edition (LGPL 2.1) as a blocking pull request
-gate, run from the official Docker image.
+Control test for a Semgrep Community Edition (LGPL 2.1) pull request gate.
 
-- `main` holds clean code. The gate passes.
-- The branch `demo/vulnerable-endpoint` adds a deliberately vulnerable Flask
-  file. The gate fails and the findings appear under Security > Code scanning.
+`main` is clean: the gate passes here with 0 findings. The branch
+`demo/vulnerable-endpoint` adds a **deliberately vulnerable test fixture** so the
+gate has something to catch, and fails with 9 findings.
 
-Reproduce locally:
+## Reproduce locally
 
     docker run --rm -v "$PWD:/src" semgrep/semgrep:1.175.0 \
       semgrep scan --config=p/default --config=p/python --metrics=off --error /src
