@@ -77,7 +77,9 @@ the audit evidence. And a new commit **dismisses the existing approval**,
 otherwise anyone could get clean code approved and then push whatever they
 liked.
 
-Full configuration, the reasoning, and how to test it: [`MERGE_GATES.md`](MERGE_GATES.md).
+Full configuration, step by step setup and how to test it:
+[`MERGE_GATES.md`](MERGE_GATES.md). How the scan runs locally versus in CI, and
+what it can and cannot see: [`HOW_IT_RUNS.md`](HOW_IT_RUNS.md).
 
 ## How Semgrep decides something is a finding
 
