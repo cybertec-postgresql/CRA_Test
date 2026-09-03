@@ -37,6 +37,48 @@ when the gate fails, so a red build still files its alerts. A naive gate fails
 at the scan step and throws the evidence away, leaving you blocked with nothing
 to show an auditor.
 
+## What blocks a merge
+
+The scan is only half the gate. A branch ruleset holds two independent
+conditions on the default branch, and the merge button stays disabled until
+both are satisfied. They are **not** a sequence: the scan starts on its own when
+the pull request opens, and the review lands whenever a person gets to it.
+
+```mermaid
+flowchart TB
+  PR["Pull request opened"] --> S["Semgrep scan<br/>starts automatically"]
+  PR --> R["Reviewer<br/>whenever they look"]
+
+  S --> SD{"Scan result"}
+  SD -->|"findings"| SF["Check fails<br/>PR stays open and blocked"]
+  SD -->|"clean"| SP["Check passes"]
+
+  R --> RD{"Approved?"}
+  RD -->|"no"| RF["Blocked"]
+  RD -->|"yes, by someone else"| RP["Approval recorded"]
+
+  SP --> M{"Both satisfied?"}
+  RP --> M
+  M -->|"yes"| OK["Merge button enabled"]
+  M -->|"no"| NO["Merge button disabled"]
+
+  SF -.->|"fix and push<br/>never close the PR"| PR
+  RP -.->|"new commit pushed<br/>approval dismissed"| R
+
+  style OK stroke:#3C6B51,stroke-width:2px
+  style SF stroke:#96453B,stroke-width:2px
+  style NO stroke:#96453B,stroke-width:2px
+```
+
+The two dotted edges are the ones that make it a real control rather than a
+formality. A failing scan sends the author back to fix the code, it does not
+close the pull request, because the record that a vulnerability was caught is
+the audit evidence. And a new commit **dismisses the existing approval**,
+otherwise anyone could get clean code approved and then push whatever they
+liked.
+
+Full configuration, the reasoning, and how to test it: [`MERGE_GATES.md`](MERGE_GATES.md).
+
 ## How Semgrep decides something is a finding
 
 Semgrep is not grep. It parses each file into a syntax tree and matches rules
