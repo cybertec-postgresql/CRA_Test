@@ -1,0 +1,42 @@
+name: semgrep
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    container:
+      image: semgrep/semgrep:1.175.0
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+
+      - name: Scan and emit SARIF
+        run: |
+          semgrep scan \
+            --config=p/default \
+            --config=p/python \
+            --metrics=off \
+            --sarif -o semgrep.sarif \
+            .
+
+      - name: Upload SARIF to code scanning
+        if: always()
+        uses: github/codeql-action/upload-sarif@5ba2889ada762081db2c4f32a729827dce632c7b # v3
+        with:
+          sarif_file: semgrep.sarif
+
+      - name: Fail the PR on findings
+        run: |
+          semgrep scan \
+            --config=p/default \
+            --config=p/python \
+            --metrics=off \
+            --error \
+            .
