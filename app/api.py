@@ -2,7 +2,7 @@
 
 from flask import Flask, jsonify, request
 
-from app import repository
+from app import reports, repository
 
 VALID_CRITICALITY = {"low", "medium", "high", "critical"}
 
@@ -46,3 +46,15 @@ def create_asset():
         return jsonify(error="unknown criticality level"), 400
     asset_id = repository.create_asset(name, criticality)
     return jsonify(id=asset_id), 201
+
+
+@app.get("/reports/<name>")
+def get_report(name: str):
+    return jsonify(report=reports.load_report(name))
+
+
+@app.post("/reports/archive")
+def archive():
+    target = request.get_json(silent=True).get("target")
+    reports.archive_reports(target)
+    return jsonify(status="archived")
