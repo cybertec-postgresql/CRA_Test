@@ -1,9 +1,10 @@
 # Merge gates
 
-Two conditions must hold before anything reaches the default branch:
+Three conditions must hold before anything reaches the default branch:
 
 1. The Semgrep scan passed.
-2. Another team member approved.
+2. The dependency review passed: no newly added package carries a known advisory.
+3. Another team member approved.
 
 This file is the configuration and the reasoning behind it. The machine
 readable form is [`.github/rulesets/default-branch.json`](.github/rulesets/default-branch.json).
@@ -236,3 +237,23 @@ and the pull request stays blocked forever.
 That looks like an outage. It is the gate failing safe: the way to remove the
 check is to change the ruleset, which is audited, not to edit a file in a
 feature branch. Do not "fix" it by removing the requirement.
+
+## Dependency review is not Dependabot
+
+Dependabot alerts scan the **default branch only**. A vulnerable pin added on a
+pull request branch raises no alert until it has already been merged, at which
+point the gate has done nothing.
+
+The `dependency-review` job closes that gap. It diffs the dependency graph of
+the pull request against the base branch and fails on any newly added package
+with a published advisory, at `fail-on-severity: low`. It needs the dependency
+graph, which is on by default for public repositories, and a `pull_request`
+trigger; it cannot run on `push`.
+
+The check is required in the ruleset alongside `scan`, pinned to the same
+GitHub Actions integration id for the same reason.
+
+Dependabot still has a job: it watches the default branch for advisories
+published **after** a package was merged, and opens the bump pull request.
+Dependency review stops the known bad version at the door; Dependabot handles
+the ones that turn bad later.
