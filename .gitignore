@@ -2,3 +2,7 @@
 *.sarif
 evidence.json
 findings_table.json
+
+# Python bytecode, never tracked
+__pycache__/
+*.pyc
