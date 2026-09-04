@@ -1,0 +1,25 @@
+#!/bin/sh
+# Runs the same Semgrep gate as CI before anything leaves the laptop.
+# Install once with: scripts/install-hooks.sh
+set -u
+cd "$(git rev-parse --show-toplevel)" || exit 1
+
+if command -v semgrep >/dev/null 2>&1; then
+    SEMGREP="semgrep"
+else
+    SEMGREP="docker run --rm -v $PWD:/src -w /src semgrep/semgrep:1.175.0 semgrep"
+fi
+
+if $SEMGREP scan --config=p/default --config=p/python --config=.semgrep/ --metrics=off --error --quiet .; then
+    exit 0
+fi
+
+cat <<MSG
+
+Push blocked: Semgrep found blocking findings in this repository.
+Fix them locally before pushing. The same scan gates the pull request,
+so a push now would only open a pull request that cannot merge.
+
+To see the findings again:  $SEMGREP scan --config=p/default --config=p/python --config=.semgrep/ --metrics=off .
+MSG
+exit 1

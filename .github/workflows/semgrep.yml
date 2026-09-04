@@ -8,6 +8,8 @@ on:
 permissions:
   contents: read
   security-events: write
+  issues: write
+  pull-requests: write
 
 jobs:
   scan:
@@ -32,6 +34,22 @@ jobs:
         uses: github/codeql-action/upload-sarif@5ba2889ada762081db2c4f32a729827dce632c7b # v3
         with:
           sarif_file: semgrep.sarif
+
+      # Runs even when the scan failed: a failing scan is exactly when the
+      # findings need an issue. Scores every finding, opens one issue per
+      # CVE or code finding, assigns the PR author, comments the table on
+      # the PR. See TRIAGE.md.
+      # Fails fast if a label definition breaks GitHub's limits (name 50,
+      # description 100 characters) or the CWE vector table is inconsistent.
+      - name: Check triage configuration
+        if: always() && github.event_name == 'pull_request'
+        run: python3 -m triage check
+
+      - name: Triage findings into issues
+        if: always() && github.event_name == 'pull_request'
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: python3 -m triage pr --event "$GITHUB_EVENT_PATH" --sarif semgrep.sarif
 
       - name: Fail the PR on findings
         run: |
