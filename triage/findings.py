@@ -170,6 +170,9 @@ def findings_from_sarif(sarif: dict, table: dict, origin: dict) -> list:
     for run in sarif.get("runs", []):
         rules = {r["id"]: r for r in run.get("tool", {}).get("driver", {}).get("rules", [])}
         for res in run.get("results", []):
+            if res.get("suppressions"):
+                # nosemgrep with a documented reason: an accepted decision, not a finding
+                continue
             rule = rules.get(res.get("ruleId"), {})
             loc = (res.get("locations") or [{}])[0].get("physicalLocation", {})
             path = loc.get("artifactLocation", {}).get("uri", "?")

@@ -97,3 +97,13 @@ def test_code_scanning_alert_becomes_the_same_key_as_the_pr_finding():
 
 def test_cwe_ids_are_pulled_from_semgrep_tags():
     assert F.cwes_from_tags(["CWE-295: Improper Certificate Validation", "security", "CWE-20: x"]) == ["CWE-295", "CWE-20"]
+
+
+def test_suppressed_sarif_results_are_not_findings():
+    # Semgrep keeps nosemgrep'd results in the SARIF with a suppressions entry.
+    # They are accepted decisions recorded in SUPPRESSIONS.md, not open findings.
+    import copy
+    sarif = copy.deepcopy(SARIF_CERT_VALIDATION)
+    sarif["runs"][0]["results"][0]["suppressions"] = [{"kind": "inSource"}]
+    out = F.findings_from_sarif(sarif, load_table(), ORIGIN)
+    assert [f.key for f in out] == ["code:python.lang.best-practice.unknown-thing:app/x.py"]
