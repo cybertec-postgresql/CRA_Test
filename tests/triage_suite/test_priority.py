@@ -23,3 +23,9 @@ def test_every_priority_has_a_label_definition():
         assert name in LABELS
         assert LABELS[name]["description"]
         assert len(LABELS[name]["color"]) == 6
+
+
+def test_label_descriptions_fit_the_github_limit():
+    # GitHub rejects label descriptions over 100 characters with a 422.
+    for name, spec in LABELS.items():
+        assert len(spec["description"]) <= 100, f"{name}: {len(spec['description'])} chars"

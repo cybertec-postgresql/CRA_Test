@@ -6,7 +6,7 @@ LABELS = {
     "P3": {"color": "fbca04", "description": "Medium, CVSS 4.0 to 6.9. Limited access or partial degradation of service."},
     "P4": {"color": "0e8a16", "description": "Low, CVSS 0.1 to 3.9. Little immediate risk, still to be patched."},
     "needs-scoring": {"color": "5319e7", "description": "No CVSS vector on file for this weakness class. Security must add one to .cra/cwe-vectors.json."},
-    "cra-triage": {"color": "0052cc", "description": "Opened automatically from a scanner finding. Do not remove: the triage script tracks the issue by this label."},
+    "cra-triage": {"color": "0052cc", "description": "Opened automatically from a scanner finding. Keep the label: the triage script tracks issues by it."},
 }
 
 

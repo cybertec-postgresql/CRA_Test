@@ -87,3 +87,19 @@ def test_upsert_pr_comment_creates_when_absent():
     })
     gh.upsert_pr_comment(12, marker + " new")
     assert [m for m, u, b in t.log] == ["GET", "POST"]
+
+
+def test_api_error_carries_the_validation_detail():
+    gh, t = make({("POST", "/repos/o/r/labels"): (422, {"message": "Validation Failed", "errors": [{"resource": "Label", "field": "description", "code": "invalid"}]})})
+    from triage.github import ApiError
+    with pytest.raises(ApiError) as exc:
+        gh.post("/repos/o/r/labels", {"name": "x"})
+    assert "description" in str(exc.value) and "invalid" in str(exc.value)
+
+
+def test_ensure_labels_tolerates_a_label_created_meanwhile():
+    gh, t = make({
+        ("GET", "/repos/o/r/labels"): (200, []),
+        ("POST", "/repos/o/r/labels"): (422, {"message": "Validation Failed", "errors": [{"resource": "Label", "code": "already_exists", "field": "name"}]}),
+    })
+    assert gh.ensure_labels() == []

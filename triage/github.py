@@ -60,7 +60,10 @@ class GitHub:
         if status == 403 and method in ("POST", "PATCH", "PUT", "DELETE"):
             raise WriteForbidden(f"{method} {url}: {data.get('message') if isinstance(data, dict) else data}")
         if status >= 400:
-            raise ApiError(f"{method} {url} -> {status}: {data.get('message') if isinstance(data, dict) else data}")
+            detail = data.get("message") if isinstance(data, dict) else data
+            if isinstance(data, dict) and data.get("errors"):
+                detail = f"{detail}; errors: {json.dumps(data['errors'])}"
+            raise ApiError(f"{method} {url} -> {status}: {detail}")
         return data
 
     def _url(self, path, params=None):
@@ -110,7 +113,12 @@ class GitHub:
         created = []
         for name, spec in LABELS.items():
             if name not in existing:
-                self.post(f"/repos/{self.repo}/labels", {"name": name, "color": spec["color"], "description": spec["description"]})
+                try:
+                    self.post(f"/repos/{self.repo}/labels", {"name": name, "color": spec["color"], "description": spec["description"]})
+                except ApiError as exc:
+                    if "already_exists" in str(exc):
+                        continue
+                    raise
                 created.append(name)
         return created
 
