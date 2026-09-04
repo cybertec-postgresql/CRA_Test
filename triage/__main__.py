@@ -1,7 +1,11 @@
 """Entry points.
 
+  python -m triage check
   python -m triage pr   --event $GITHUB_EVENT_PATH --sarif semgrep.sarif
   python -m triage main --repo-dir . [--default-assignee login]
+
+check validates the label definitions against GitHub's limits and the
+vector table against the CVSS formula. The workflows run it first.
 
 Both need GITHUB_TOKEN and GITHUB_REPOSITORY in the environment.
 """
@@ -109,9 +113,22 @@ def run_main(args) -> int:
     return 0
 
 
+def run_check(args) -> int:
+    from triage import check
+
+    found = check.problems()
+    for msg in found:
+        _log(f"::error::{msg}")
+    if found:
+        return 1
+    _log(f"triage configuration ok: {len(check.LABELS)} labels within GitHub limits, vector table consistent")
+    return 0
+
+
 def main(argv=None) -> int:
     p = argparse.ArgumentParser(prog="triage")
     sub = p.add_subparsers(dest="mode", required=True)
+    sub.add_parser("check")
     pr = sub.add_parser("pr")
     pr.add_argument("--event", default=os.environ.get("GITHUB_EVENT_PATH"))
     pr.add_argument("--sarif", default="semgrep.sarif")
@@ -119,6 +136,8 @@ def main(argv=None) -> int:
     mn.add_argument("--repo-dir", default=".")
     mn.add_argument("--default-assignee", default=os.environ.get("TRIAGE_DEFAULT_ASSIGNEE") or None)
     args = p.parse_args(argv)
+    if args.mode == "check":
+        return run_check(args)
     try:
         return run_pr(args) if args.mode == "pr" else run_main(args)
     except WriteForbidden as exc:

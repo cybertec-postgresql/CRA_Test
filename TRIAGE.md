@@ -120,6 +120,24 @@ the same script, so moving to a receiver later is a trigger change, not a
 rewrite. Note that GitHub disables scheduled workflows in a public repository
 after 60 days without a commit.
 
+## Configuration rules
+
+These are enforced twice: by the unit tests, and by `python3 -m triage check`,
+which both workflows run before any triage step. A violation fails the
+workflow at the check step with the offending item named.
+
+| Rule | Limit | Why |
+|---|---|---|
+| Label description | 100 characters | GitHub rejects longer ones with `422 Validation Failed`. The first pull request run failed this way on a 109 character description. |
+| Label name | 50 characters | Same API limit. |
+| Label colour | six hex digits, no `#` | The API format. |
+| Vector table row | stated score equals the score its vector computes to | The score on an issue must be reproducible from the vector printed next to it. |
+| Vector table row | has `name`, `vector`, `score`, `rationale` | The rationale is the review record for the vector. |
+
+Labels are defined in one place, `triage/priority.py`. Change them there, run
+the tests, and the check step confirms the result before the workflow touches
+the repository.
+
 ## Setup on a new repository
 
 1. Copy `triage/`, `.cra/`, `scripts/hooks/`, `scripts/install-hooks.sh` and

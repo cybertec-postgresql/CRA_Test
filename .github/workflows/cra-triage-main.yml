@@ -26,6 +26,9 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Check triage configuration
+        run: python3 -m triage check
+
       - name: Reconcile alerts with issues
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
