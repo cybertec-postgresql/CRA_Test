@@ -5,6 +5,8 @@ Two conditions must hold before anything reaches the default branch:
 1. The Semgrep scan passed.
 2. Another team member approved.
 
+What happens to a finding after the gate catches it is in [TRIAGE.md](TRIAGE.md).
+
 This file is the configuration and the reasoning behind it. The machine
 readable form is [`.github/rulesets/default-branch.json`](.github/rulesets/default-branch.json).
 

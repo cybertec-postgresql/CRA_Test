@@ -1,0 +1,33 @@
+name: cra-triage-main
+
+# Dependabot and code scanning alerts on the default branch cannot start a
+# workflow, so this one polls. Every 15 minutes it reads the alert lists and
+# reconciles them with issues: open alert, open issue; fixed or dismissed
+# alert, closed issue with the reason. See TRIAGE.md.
+on:
+  schedule:
+    - cron: "*/15 * * * *"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  issues: write
+  security-events: read
+
+concurrency:
+  group: cra-triage-main
+  cancel-in-progress: false
+
+jobs:
+  reconcile:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          fetch-depth: 0
+
+      - name: Reconcile alerts with issues
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          TRIAGE_DEFAULT_ASSIGNEE: ${{ vars.TRIAGE_DEFAULT_ASSIGNEE }}
+        run: python3 -m triage main --repo-dir .
