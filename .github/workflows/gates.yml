@@ -1,0 +1,20 @@
+# Copy to .github/workflows/gates.yml in each repository. Pin the ref to a
+# cra-gates commit sha once the first version is tagged.
+name: gates
+
+on:
+  pull_request:
+  push:
+    branches: [main]
+
+permissions:
+  contents: read
+  security-events: write
+  issues: write
+  pull-requests: write
+
+jobs:
+  gates:
+    uses: cybertec-postgresql/cra-gates/.github/workflows/gates.yml@6941732ee455b3c33f34398bc1fe27bb02b04274
+    with:
+      private: false
