@@ -24,3 +24,4 @@ def database_url() -> str:
 
 def pool_size() -> int:
     return int(os.environ.get("DB_POOL_SIZE", "8"))
+AWS_ACCESS_KEY_ID = os.environ.get("AWS_ACCESS_KEY_ID")

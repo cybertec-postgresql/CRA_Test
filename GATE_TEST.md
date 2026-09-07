@@ -144,6 +144,76 @@ Exit status 0. The clean commit reached `origin`.
 
 ## Gate 2, the pull request
 
-To be recorded from the pull request opened from `demo/local-gate-test`:
-the three required checks, the issues the triage bot opened with their
-priority labels and assignee, the fix, the approval and the merge.
+The planted commit was pushed with `git push --no-verify`, which is what a
+laptop without the hook looks like. GitHub accepted the push: its own push
+protection did not stop the synthetic key. Pull request
+[#18](https://github.com/cybertec-postgresql/CRA_Test/pull/18) was opened
+by the manager.
+
+### The checks
+
+| Check | Result | What it said |
+|---|---|---|
+| `secret-scan` | failed, 24 s | `gitleaks found a committed secret. Rotate it, remove it and rewrite the branch.` SARIF uploaded to code scanning under `gitleaks`, handed to triage |
+| `dependency-review` | failed, 28 s | three moderate advisories on `requests 2.31.0`, summary commented on the pull request |
+| `scan` | failed | two Semgrep findings: the disabled certificate check and the key; the triage step ran before the failure |
+
+The merge box stayed blocked: failing required checks and no approving review.
+
+### The issues the bot opened
+
+One issue per finding, all assigned to the pull request author, all labelled
+`cra-triage` plus the priority:
+
+| Issue | Priority | Finding | CVSS 3.1 |
+|---|---|---|---|
+| [#19](https://github.com/cybertec-postgresql/CRA_Test/issues/19) | P3 | CVE-2026-25645, requests 2.31.0, insecure temp file reuse | 4.4 |
+| [#20](https://github.com/cybertec-postgresql/CRA_Test/issues/20) | P3 | CVE-2024-47081, requests 2.31.0, .netrc credential leak | 5.3 |
+| [#21](https://github.com/cybertec-postgresql/CRA_Test/issues/21) | P3 | CVE-2024-35195, requests 2.31.0, verify=False persists on the session | 5.6 |
+| [#22](https://github.com/cybertec-postgresql/CRA_Test/issues/22) | P2 | CWE-295, `app/upstream.py:7`, certificate validation disabled | 7.4, assessed |
+| [#23](https://github.com/cybertec-postgresql/CRA_Test/issues/23) | P2 | CWE-798, `app/config.py:29`, hard-coded credential | 7.5, assessed |
+
+Five issues for three planted problems, because one pin carried three
+advisories and the decision on record is one issue per CVE. The key was seen
+by both gitleaks and Semgrep's generic secrets rule and became one issue, not
+two. The same table was posted as a comment on the pull request.
+
+### Two things noticed on the way
+
+- GitHub's `github-advanced-security[bot]` also left a review comment on the
+  key, from the SARIF uploaded to code scanning. Free on a public repository.
+- The workflow log carried two deprecation warnings unrelated to the gates:
+  Node.js 20 actions should move to Node.js 24, and CodeQL Action v3 is
+  deprecated with a December 2026 deadline. Both are pinned by SHA in the
+  workflows and are a maintenance item, not a gate defect.
+
+### The fix
+
+Dev A fixed all three on the same branch: `requests==2.33.0`, the key read
+from the environment, `verify=True`. Because the key was in a commit, the
+commit was rewritten rather than followed by a second one, so the history the
+pull request adds no longer contains it. The push went through Gate 1 (all
+three PASS) and re-ran Gate 2. The bot closes the issues it opened once the
+findings are gone from the pull request head; the result of that run and the
+approval are recorded below.
+
+### After the fix
+
+The rewritten branch, rebased onto `main` because the ruleset requires an up
+to date branch, was pushed through Gate 1 (three PASS) and re-ran Gate 2:
+
+| Check | Result |
+|---|---|
+| `secret-scan` | passed |
+| `dependency-review` | passed |
+| `scan` | passed |
+
+The triage step updated its pull request comment to "No findings on this pull
+request head" and closed issues #19 to #23 automatically, each with the
+comment that the finding is no longer present at the head of pull request
+#18. Nobody closed anything by hand.
+
+### Approval and merge
+
+Recorded by GitHub on the pull request: one approving review from a team
+member who is not the author, given after the last push, then the merge.
