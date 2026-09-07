@@ -88,3 +88,36 @@ CODE_SCANNING_ALERT_OPEN = {
     "most_recent_instance": {"location": {"path": "app/upstream.py", "start_line": 17}, "message": {"text": "Certificate verification has been explicitly disabled."}},
     "dismissed_reason": None, "dismissed_by": None,
 }
+
+# gitleaks v8.30 SARIF, captured from a run with --redact. The driver carries
+# no CWE tags and no help URI, so the triage code has to know what a secret is.
+SARIF_GITLEAKS = {
+    "runs": [
+        {
+            "tool": {"driver": {
+                "name": "gitleaks",
+                "semanticVersion": "v8.0.0",
+                "rules": [{"id": "aws-access-token", "shortDescription": {"text": "Identified a pattern that may indicate AWS credentials."}}],
+            }},
+            "results": [
+                {
+                    "message": {"text": "aws-access-token has detected secret for file app/config.py at commit b55bdd586def84cb690fe0d1c8529f7f9dd48c74."},
+                    "ruleId": "aws-access-token",
+                    "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app/config.py"}, "region": {"startLine": 3, "startColumn": 23, "endLine": 3, "endColumn": 42, "snippet": {"text": "REDACTED"}}}}],
+                    "partialFingerprints": {"commitSha": "b55bdd586def84cb690fe0d1c8529f7f9dd48c74", "email": "t@t", "author": "t", "date": "2026-09-07T09:27:59Z", "commitMessage": "plant"},
+                    "properties": {"tags": []},
+                }
+            ],
+        }
+    ]
+}
+
+CODE_SCANNING_ALERT_GITLEAKS = {
+    "number": 7,
+    "state": "open",
+    "html_url": "https://github.com/o/r/security/code-scanning/7",
+    "rule": {"id": "aws-access-token", "severity": None, "tags": [], "description": "Identified a pattern that may indicate AWS credentials."},
+    "tool": {"name": "gitleaks"},
+    "most_recent_instance": {"location": {"path": "app/config.py", "start_line": 3}, "message": {"text": "aws-access-token has detected secret for file app/config.py at commit b55bdd5."}},
+    "dismissed_reason": None, "dismissed_by": None,
+}

@@ -13,6 +13,14 @@ from triage.priority import priority as _priority
 _PIN = re.compile(r"^\s*([A-Za-z0-9][A-Za-z0-9._-]*)(?:\[[^\]]*\])?\s*==\s*([^\s;#]+)")
 _CWE = re.compile(r"^(CWE-\d+)(?::\s*(.*))?$")
 
+# A secret scanner reports a rule id, never a weakness id. Every leaked
+# credential is the same weakness class, so it is scored from that row.
+SECRET_CWE_TAG = "CWE-798: Hard-coded Credentials"
+
+
+def tool_from_name(name: str | None) -> str:
+    return "gitleaks" if (name or "").lower().startswith("gitleaks") else "semgrep"
+
 
 @dataclass
 class Finding:
@@ -38,6 +46,7 @@ class Finding:
     vulnerable_range: str | None = None
     fixed_in: str | None = None
     location: tuple | None = None  # (path, line)
+    tool: str = "semgrep"  # "semgrep" or "gitleaks"
     rule_id: str | None = None
     rule_url: str | None = None
     rule_level: str | None = None
@@ -133,9 +142,12 @@ def findings_from_advisories(name: str, version: str, manifest: str, advisories:
     return out
 
 
-def _code_finding(rule_id, rule_url, level, tags, path, line, message, table, origin, state="open") -> Finding:
+def _code_finding(rule_id, rule_url, level, tags, path, line, message, table, origin, state="open", tool="semgrep") -> Finding:
     from triage.cwe_vectors import score_for_cwe
 
+    if tool == "gitleaks":
+        tags = [SECRET_CWE_TAG]
+        rule_url = None
     cwes = cwes_from_tags(tags)
     names = cwe_names_from_tags(tags)
     score = vector = None
@@ -159,6 +171,7 @@ def _code_finding(rule_id, rule_url, level, tags, path, line, message, table, or
         cvss31_score=score, cvss31_vector=vector,
         score_source="cwe-table" if score is not None else None,
         location=(path, line),
+        tool=tool,
         rule_id=rule_id, rule_url=rule_url, rule_level=level,
         message=message,
         reported_severity=level,
@@ -168,7 +181,9 @@ def _code_finding(rule_id, rule_url, level, tags, path, line, message, table, or
 def findings_from_sarif(sarif: dict, table: dict, origin: dict) -> list:
     out = []
     for run in sarif.get("runs", []):
-        rules = {r["id"]: r for r in run.get("tool", {}).get("driver", {}).get("rules", [])}
+        driver = run.get("tool", {}).get("driver", {})
+        tool = tool_from_name(driver.get("name"))
+        rules = {r["id"]: r for r in driver.get("rules", [])}
         for res in run.get("results", []):
             if res.get("suppressions"):
                 # nosemgrep with a documented reason: an accepted decision, not a finding
@@ -184,7 +199,7 @@ def findings_from_sarif(sarif: dict, table: dict, origin: dict) -> list:
                 tags=rule.get("properties", {}).get("tags", []),
                 path=path, line=line,
                 message=res.get("message", {}).get("text"),
-                table=table, origin=origin,
+                table=table, origin=origin, tool=tool,
             ))
     return out
 
@@ -215,17 +230,34 @@ def finding_from_code_scanning_alert(alert: dict, table: dict) -> Finding:
     loc = inst.get("location") or {}
     origin = {"kind": "code-scanning", "number": alert["number"], "url": alert.get("html_url")}
     rule_id = rule.get("id")
+    tool = tool_from_name((alert.get("tool") or {}).get("name"))
     f = _code_finding(
         rule_id=rule_id,
-        rule_url=f"https://semgrep.dev/r/{rule_id}" if rule_id else None,
+        rule_url=f"https://semgrep.dev/r/{rule_id}" if rule_id and tool == "semgrep" else None,
         level=rule.get("severity"),
         tags=rule.get("tags", []),
         path=loc.get("path", "?"), line=loc.get("start_line"),
         message=(inst.get("message") or {}).get("text") or rule.get("description"),
         table=table, origin=origin,
-        state=_alert_state(alert.get("state", "open")),
+        state=_alert_state(alert.get("state", "open")), tool=tool,
     )
     f.dismissed_reason = alert.get("dismissed_reason")
     f.dismissed_by = (alert.get("dismissed_by") or {}).get("login")
     f.dismissed_comment = alert.get("dismissed_comment")
     return f
+
+
+def dedupe_secrets(findings: list) -> list:
+    """One committed secret, one issue. Semgrep's generic secrets rules flag the
+    same line gitleaks does; when both saw a file, gitleaks is the tool of record
+    and the Semgrep CWE-798 finding on that file is dropped."""
+    seen_by_gitleaks = {f.location[0] for f in findings if f.tool == "gitleaks" and f.location}
+    out = []
+    for f in findings:
+        duplicate = (
+            f.tool == "semgrep" and f.primary_cwe == "CWE-798"
+            and f.location and f.location[0] in seen_by_gitleaks
+        )
+        if not duplicate:
+            out.append(f)
+    return out

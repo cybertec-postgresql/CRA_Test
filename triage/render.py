@@ -18,6 +18,13 @@ CRA_NOTE = (
 )
 
 
+SECRET_ACTION = (
+    "**Action:** rotate the credential first. A secret that has been committed is exposed even after "
+    "the line is removed. Then take the commit out of the branch history (squash or rebase) before "
+    "pushing again, so the secret scan of the pull request goes green."
+)
+
+
 def marker(key: str) -> str:
     return f"<!-- cra-triage: key={key} -->"
 
@@ -103,10 +110,15 @@ def issue_body(f: Finding) -> str:
         path, line = f.location or ("?", None)
         lines.append(f"**Location:** `{path}`" + (f", line {line}" if line else ""))
         rule = f"[{f.rule_id}]({f.rule_url})" if f.rule_url else f"`{f.rule_id}`"
-        lines.append(f"**Rule:** {rule}, Semgrep level {f.rule_level or 'unknown'}")
+        if f.tool == "gitleaks":
+            lines.append(f"**Rule:** {rule}, gitleaks")
+        else:
+            lines.append(f"**Rule:** {rule}, Semgrep level {f.rule_level or 'unknown'}")
         if f.message:
             lines.append(f"**Message:** {f.message}")
         lines.extend(_score_lines(f))
+        if f.tool == "gitleaks":
+            lines.append(SECRET_ACTION)
     if f.cwes:
         lines.append("**Weakness:** " + ", ".join(f"{c} {f.cwe_names.get(c, '')}".strip() for c in f.cwes))
     lines.append(f"**Found on:** {_origin_line(f.origin)}")

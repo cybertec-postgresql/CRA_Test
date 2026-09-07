@@ -1,7 +1,7 @@
 """Entry points.
 
   python -m triage check
-  python -m triage pr   --event $GITHUB_EVENT_PATH --sarif semgrep.sarif
+  python -m triage pr   --event $GITHUB_EVENT_PATH --sarif semgrep.sarif --sarif gitleaks.sarif
   python -m triage main --repo-dir . [--default-assignee login]
 
 check validates the label definitions against GitHub's limits and the
@@ -53,8 +53,12 @@ def run_pr(args) -> int:
     base_text = gh.file_at(MANIFEST, pr["base"]["sha"])
     for name, version in F.added_pins(base_text, head_text):
         findings.extend(F.findings_from_advisories(name, version, MANIFEST, gh.advisories(name, version), origin))
-    if args.sarif and os.path.exists(args.sarif):
-        findings.extend(F.findings_from_sarif(json.load(open(args.sarif, encoding="utf-8")), table, origin))
+    for sarif_path in args.sarif:
+        if os.path.exists(sarif_path):
+            findings.extend(F.findings_from_sarif(json.load(open(sarif_path, encoding="utf-8")), table, origin))
+        else:
+            _log(f"::notice::no {sarif_path}; that scanner produced no report")
+    findings = F.dedupe_secrets(findings)
 
     gh.ensure_labels()
     previous = set(R.keys_from_pr_comment(gh.existing_pr_comment(number)))
@@ -125,17 +129,24 @@ def run_check(args) -> int:
     return 0
 
 
-def main(argv=None) -> int:
+def parse_args(argv=None):
     p = argparse.ArgumentParser(prog="triage")
     sub = p.add_subparsers(dest="mode", required=True)
     sub.add_parser("check")
     pr = sub.add_parser("pr")
     pr.add_argument("--event", default=os.environ.get("GITHUB_EVENT_PATH"))
-    pr.add_argument("--sarif", default="semgrep.sarif")
+    pr.add_argument("--sarif", action="append", help="SARIF report to triage; repeat for several scanners")
     mn = sub.add_parser("main")
     mn.add_argument("--repo-dir", default=".")
     mn.add_argument("--default-assignee", default=os.environ.get("TRIAGE_DEFAULT_ASSIGNEE") or None)
     args = p.parse_args(argv)
+    if args.mode == "pr" and not args.sarif:
+        args.sarif = ["semgrep.sarif"]
+    return args
+
+
+def main(argv=None) -> int:
+    args = parse_args(argv)
     if args.mode == "check":
         return run_check(args)
     try:
