@@ -1,9 +1,11 @@
+# Copy to .github/workflows/cra-triage-main.yml in each repository. Polls the
+# default branch's alerts every 15 minutes and mirrors them to issues, using
+# the triage code from cra-gates. Dependabot alerts need a token with the
+# Dependabot alerts permission: add a fine grained token as the TRIAGE_TOKEN
+# secret (Dependabot alerts: read, Issues: write). Without it the run still
+# reconciles code scanning alerts and warns about the rest.
 name: cra-triage-main
 
-# Dependabot and code scanning alerts on the default branch cannot start a
-# workflow, so this one polls. Every 15 minutes it reads the alert lists and
-# reconciles them with issues: open alert, open issue; fixed or dismissed
-# alert, closed issue with the reason. See TRIAGE.md.
 on:
   schedule:
     - cron: "*/15 * * * *"
@@ -26,11 +28,18 @@ jobs:
         with:
           fetch-depth: 0
 
+      - name: Fetch the triage code and vector table
+        uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: cybertec-postgresql/cra-gates
+          ref: 53209a89adf546ce77ea8772f031da4f8aa0d298
+          path: .cra-gates
+
       - name: Check triage configuration
-        run: python3 -m triage check
+        run: PYTHONPATH=.cra-gates python3 -m triage check
 
       - name: Reconcile alerts with issues
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITHUB_TOKEN: ${{ secrets.TRIAGE_TOKEN || secrets.GITHUB_TOKEN }}
           TRIAGE_DEFAULT_ASSIGNEE: ${{ vars.TRIAGE_DEFAULT_ASSIGNEE }}
-        run: python3 -m triage main --repo-dir .
+        run: PYTHONPATH=.cra-gates python3 -m triage main --repo-dir .
