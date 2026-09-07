@@ -199,4 +199,21 @@ approval are recorded below.
 
 ### After the fix
 
-To be recorded once the checks report.
+The rewritten branch, rebased onto `main` because the ruleset requires an up
+to date branch, was pushed through Gate 1 (three PASS) and re-ran Gate 2:
+
+| Check | Result |
+|---|---|
+| `secret-scan` | passed |
+| `dependency-review` | passed |
+| `scan` | passed |
+
+The triage step updated its pull request comment to "No findings on this pull
+request head" and closed issues #19 to #23 automatically, each with the
+comment that the finding is no longer present at the head of pull request
+#18. Nobody closed anything by hand.
+
+### Approval and merge
+
+Recorded by GitHub on the pull request: one approving review from a team
+member who is not the author, given after the last push, then the merge.
