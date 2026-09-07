@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: cybertec-postgresql/cra-gates
-          ref: 53209a89adf546ce77ea8772f031da4f8aa0d298
+          ref: 3c49d6fb76a20ecd16aed5a9fe0214d9a2c6b8df
           path: .cra-gates
 
       - name: Check triage configuration
