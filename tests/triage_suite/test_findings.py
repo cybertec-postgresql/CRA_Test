@@ -107,3 +107,31 @@ def test_suppressed_sarif_results_are_not_findings():
     sarif["runs"][0]["results"][0]["suppressions"] = [{"kind": "inSource"}]
     out = F.findings_from_sarif(sarif, load_table(), ORIGIN)
     assert [f.key for f in out] == ["code:python.lang.best-practice.unknown-thing:app/x.py"]
+
+
+def test_gitleaks_sarif_finding_is_a_hardcoded_credential_scored_from_the_table():
+    from .fixtures import SARIF_GITLEAKS
+    (f,) = F.findings_from_sarif(SARIF_GITLEAKS, load_table(), ORIGIN)
+    assert f.tool == "gitleaks"
+    assert f.kind == "code"
+    assert f.key == "code:aws-access-token:app/config.py"
+    assert f.cwes == ["CWE-798"]
+    assert f.summary == "Hard-coded Credentials"
+    assert f.cvss31_score == 7.5 and f.priority == "P2"
+    assert f.score_source == "cwe-table"
+    assert f.location == ("app/config.py", 3)
+    assert f.rule_url is None
+
+
+def test_semgrep_sarif_findings_still_say_semgrep():
+    known, _ = F.findings_from_sarif(SARIF_CERT_VALIDATION, load_table(), ORIGIN)
+    assert known.tool == "semgrep"
+
+
+def test_gitleaks_code_scanning_alert_shares_the_pr_key_and_score():
+    from .fixtures import CODE_SCANNING_ALERT_GITLEAKS
+    f = F.finding_from_code_scanning_alert(CODE_SCANNING_ALERT_GITLEAKS, load_table())
+    assert f.tool == "gitleaks"
+    assert f.key == "code:aws-access-token:app/config.py"
+    assert f.cwes == ["CWE-798"] and f.cvss31_score == 7.5 and f.priority == "P2"
+    assert f.rule_url is None

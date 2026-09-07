@@ -5,7 +5,9 @@
   "bypass_actors": [],
   "conditions": {
     "ref_name": {
-      "include": ["~DEFAULT_BRANCH"],
+      "include": [
+        "~DEFAULT_BRANCH"
+      ],
       "exclude": []
     }
   },
@@ -18,7 +20,11 @@
         "require_last_push_approval": true,
         "require_code_owner_review": false,
         "required_review_thread_resolution": false,
-        "allowed_merge_methods": ["squash", "merge", "rebase"]
+        "allowed_merge_methods": [
+          "squash",
+          "merge",
+          "rebase"
+        ]
       }
     },
     {
@@ -34,11 +40,19 @@
           {
             "context": "dependency-review",
             "integration_id": 15368
+          },
+          {
+            "context": "secret-scan",
+            "integration_id": 15368
           }
         ]
       }
     },
-    { "type": "non_fast_forward" },
-    { "type": "deletion" }
+    {
+      "type": "non_fast_forward"
+    },
+    {
+      "type": "deletion"
+    }
   ]
 }

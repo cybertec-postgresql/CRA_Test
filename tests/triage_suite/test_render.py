@@ -92,3 +92,15 @@ def test_close_and_reopen_comments_carry_action_markers():
     r = R.reopen_comment(f)
     assert R.action_from_comment(r) == "reopen"
     assert R.action_from_comment("hello") is None
+
+
+def test_secret_issue_tells_the_developer_to_rotate_and_rewrite():
+    from .fixtures import SARIF_GITLEAKS
+    (f,) = F.findings_from_sarif(SARIF_GITLEAKS, load_table(), ORIGIN)
+    body = R.issue_body(f)
+    assert R.issue_title(f) == "[P2] CWE-798: app/config.py:3, Hard-coded Credentials"
+    assert "**Rule:** `aws-access-token`, gitleaks" in body
+    assert "rotate" in body.lower()
+    assert "history" in body.lower()
+    assert "semgrep.dev" not in body
+    assert "REDACTED" not in body or "secret" in body.lower()

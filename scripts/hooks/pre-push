@@ -1,25 +1,102 @@
 #!/bin/sh
-# Runs the same Semgrep gate as CI before anything leaves the laptop.
-# Install once with: scripts/install-hooks.sh
+# Gate 1. Runs on the laptop before anything leaves it, and refuses the push
+# on any finding. Three checks, the same three that gate the pull request:
+#
+#   secrets   gitleaks      passwords, keys and tokens in the commits being pushed
+#   packages  osv-scanner   pinned packages with a published CVE, with CVSS score
+#   code      semgrep       insecure code patterns, the repository's rule set
+#
+# All three run and report before the verdict, so one push shows every problem.
+# Each tool is used natively if installed, otherwise from its pinned container.
+# Install once per clone with: scripts/install-hooks.sh
 set -u
 cd "$(git rev-parse --show-toplevel)" || exit 1
 
-if command -v semgrep >/dev/null 2>&1; then
-    SEMGREP="semgrep"
-else
-    SEMGREP="docker run --rm -v $PWD:/src -w /src semgrep/semgrep:1.175.0 semgrep"
-fi
+GITLEAKS_IMAGE="ghcr.io/gitleaks/gitleaks:v8.30.1"
+OSV_IMAGE="ghcr.io/google/osv-scanner:v2.5.1"
+SEMGREP_IMAGE="semgrep/semgrep:1.175.0"
+MANIFEST="requirements.txt"
+SEMGREP_ARGS="--config=p/default --config=p/python --config=.semgrep/ --metrics=off"
+ZERO="0000000000000000000000000000000000000000"
 
-if $SEMGREP scan --config=p/default --config=p/python --config=.semgrep/ --metrics=off --error --quiet .; then
+# git hands the hook one line per ref: local_ref local_sha remote_ref remote_sha.
+# The commits about to leave are those reachable from local_sha that no branch on
+# origin has yet. A deletion (local_sha all zeros) pushes nothing and is skipped.
+REVS=""
+while read -r local_ref local_sha remote_ref remote_sha; do
+    [ "$local_sha" = "$ZERO" ] && continue
+    REVS="$REVS $local_sha"
+done
+[ -z "$REVS" ] && exit 0
+LOG_OPTS="$REVS --not --remotes=origin"
+
+# Containers run as root and git refuses a repository owned by another user
+# unless it is marked safe. These three variables do that for the mount only.
+GIT_SAFE="-e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo"
+
+run_secrets() {
+    if command -v gitleaks >/dev/null 2>&1; then
+        gitleaks git . --log-opts="$LOG_OPTS" --redact --no-banner --exit-code 1
+    else
+        # shellcheck disable=SC2086
+        docker run --rm -v "$PWD:/repo" $GIT_SAFE "$GITLEAKS_IMAGE" \
+            git /repo --log-opts="$LOG_OPTS" --redact --no-banner --exit-code 1
+    fi
+}
+
+run_packages() {
+    [ -f "$MANIFEST" ] || { echo "no $MANIFEST, nothing to check"; return 0; }
+    if command -v osv-scanner >/dev/null 2>&1; then
+        osv-scanner scan source -L "$MANIFEST"
+    else
+        docker run --rm -v "$PWD:/src" -w /src "$OSV_IMAGE" scan source -L "$MANIFEST"
+    fi
+}
+
+run_code() {
+    if command -v semgrep >/dev/null 2>&1; then
+        # shellcheck disable=SC2086
+        semgrep scan $SEMGREP_ARGS --error --quiet .
+    else
+        # shellcheck disable=SC2086
+        docker run --rm -v "$PWD:/src" -w /src "$SEMGREP_IMAGE" semgrep scan $SEMGREP_ARGS --error --quiet .
+    fi
+}
+
+section() {
+    printf '\n== Gate 1, %s (%s)\n' "$1" "$2"
+}
+
+verdict() {
+    if [ "$1" -eq 0 ]; then echo "PASS"; else echo "FAIL"; fi
+}
+
+section "secrets" "gitleaks"
+run_secrets; SECRETS=$?
+section "packages" "osv-scanner"
+run_packages; PACKAGES=$?
+section "code" "semgrep"
+run_code; CODE=$?
+
+printf '\nGate 1 summary\n'
+printf '  secrets   gitleaks     %s\n' "$(verdict $SECRETS)"
+printf '  packages  osv-scanner  %s\n' "$(verdict $PACKAGES)"
+printf '  code      semgrep      %s\n' "$(verdict $CODE)"
+
+if [ "$SECRETS" -eq 0 ] && [ "$PACKAGES" -eq 0 ] && [ "$CODE" -eq 0 ]; then
+    echo "Clean. Pushing."
     exit 0
 fi
 
 cat <<MSG
 
-Push blocked: Semgrep found blocking findings in this repository.
-Fix them locally before pushing. The same scan gates the pull request,
-so a push now would only open a pull request that cannot merge.
+Push refused. Nothing has left this computer.
+Fix the findings above and push again. The same three checks gate the pull
+request on GitHub, so a push around this hook only opens a pull request that
+cannot merge and creates an issue assigned to you.
 
-To see the findings again:  $SEMGREP scan --config=p/default --config=p/python --config=.semgrep/ --metrics=off .
+A secret finding means the credential is already exposed in a commit: rotate
+it, remove it, then take that commit out of the branch history before pushing.
+See MERGE_GATES.md.
 MSG
 exit 1
