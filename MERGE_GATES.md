@@ -1,12 +1,71 @@
 # Merge gates
 
-Three conditions must hold before anything reaches the default branch:
+Four conditions must hold before anything reaches the default branch:
 
 1. The Semgrep scan passed.
 2. The dependency review passed: no newly added package carries a known advisory.
-3. Another team member approved.
+3. The secret scan passed: no credential in the commits the pull request adds.
+4. Another team member approved.
 
-What happens to a finding after the gate catches it is in [TRIAGE.md](TRIAGE.md).
+The same three scanners run on the laptop first, in the pre-push hook, so a
+developer normally finds out before anything is uploaded. That is Gate 1; the
+conditions above are Gate 2. What happens to a finding after a gate catches it
+is in [TRIAGE.md](TRIAGE.md).
+
+## Gate 1: the pre-push hook
+
+`scripts/hooks/pre-push` runs before every `git push`, on the commits that are
+about to leave and are not yet on `origin`:
+
+| Check | Tool | Catches |
+|---|---|---|
+| secrets | gitleaks `v8.30.1` | passwords, keys and tokens in the commits being pushed |
+| packages | OSV-Scanner `v2.5.1` | pinned packages with a published CVE, printed with CVSS score and fixed version |
+| code | Semgrep CE `1.175.0` | insecure code patterns, `p/default`, `p/python` and `.semgrep/` |
+
+All three run and report before the verdict, so one refused push shows every
+problem at once. Each tool is used natively if it is on the `PATH`, otherwise
+from its pinned container image, so a laptop needs Docker and nothing else.
+Install once per clone with `scripts/install-hooks.sh`.
+
+The hook is a courtesy, not a control. A developer can run `git push
+--no-verify` or never install it, and git cannot stop that. Gate 2 exists for
+exactly that case: the same three checks are required status checks on the
+pull request, and the only thing a skipped hook achieves is a pull request
+that cannot merge and an issue assigned to its author.
+
+Three details in the hook came out of testing it, not designing it:
+
+- OSV-Scanner resolves the transitive dependencies of a plain
+  `requirements.txt` by picking versions itself, and flagged an `idna` release
+  that nothing pins and pip would not install. Without a lockfile that is a
+  guess, and it would refuse pushes that Gate 2 accepts, because dependency
+  review judges the pins. The hook passes `--no-resolve` so both gates judge
+  the same thing. Once the project has a lockfile (PEP 751 or `pip-compile`),
+  drop the flag and both gates gain transitive coverage.
+
+- gitleaks exits 0 when git itself fails, so an empty or malformed revision
+  range would pass as "no leaks found". The hook enumerates the range with
+  `git rev-list` first and refuses the push if that fails.
+- A secret is exposed the moment it is committed, not when it is pushed. The
+  fix is to rotate the credential, remove it, and take the commit out of the
+  branch history (amend, squash or rebase) before pushing, otherwise the
+  secret scan on the pull request still sees it in the commits being added.
+
+## Gate 2: the secret scan
+
+The `secret-scan` job in `.github/workflows/semgrep.yml` runs the same gitleaks
+build over the commit range the pull request adds (`base..head`), or over the
+commits just pushed on `main`. It scans the range, not the head tree, because
+a secret removed in a later commit is still in the history the pull request
+would merge. Its SARIF goes to code scanning under the `gitleaks` category
+and to the `scan` job, whose triage step scores each secret as CWE-798 from
+`.cra/cwe-vectors.json` and opens one issue per finding. The check is required
+in the ruleset next to `scan` and `dependency-review`, pinned to the same
+GitHub Actions integration id.
+
+Secret findings are always printed redacted, in the hook and in the workflow
+log. The credential never appears in a log a third party could read.
 
 This file is the configuration and the reasoning behind it. The machine
 readable form is [`.github/rulesets/default-branch.json`](.github/rulesets/default-branch.json).
@@ -87,7 +146,7 @@ counts. Verify the id for your own tenant with `GET /apps/github-actions`.
 | Require a pull request | approvals `1` | Another team member must sign off |
 | Dismiss stale approvals on push | on | See above |
 | Require approval of most recent push | on | See above |
-| Require status checks | `scan`, pinned to app `15368` | The gate itself |
+| Require status checks | `scan`, `dependency-review`, `secret-scan`, pinned to app `15368` | The gate itself |
 | Require branches up to date | on | See trade-off below |
 | Block force pushes | on | History cannot be rewritten under a merged review |
 | Restrict deletions | on | The branch cannot be removed to dodge the rule |
@@ -161,8 +220,8 @@ Tick **Require a pull request before merging**, then set:
 
 Tick **Require status checks to pass**, then:
 
-1. Click **Add checks** and search for `scan`. It only appears if it has run at
-   least once on this repository, which it has.
+1. Click **Add checks** and add `scan`, `dependency-review` and `secret-scan`.
+   A check only appears once it has run at least once on this repository.
 2. Set the source to **GitHub Actions**, not "any source". This is the pinning
    described above, and it is the difference between a gate and a gate with the
    key left in it.

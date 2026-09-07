@@ -58,6 +58,7 @@ def run_pr(args) -> int:
             findings.extend(F.findings_from_sarif(json.load(open(sarif_path, encoding="utf-8")), table, origin))
         else:
             _log(f"::notice::no {sarif_path}; that scanner produced no report")
+    findings = F.dedupe_secrets(findings)
 
     gh.ensure_labels()
     previous = set(R.keys_from_pr_comment(gh.existing_pr_comment(number)))

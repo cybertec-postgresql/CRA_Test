@@ -14,18 +14,20 @@ laptop                                 GitHub
 ------                                 ------
 git push
   |
-  pre-push hook runs Semgrep
-  |   fail: "fix locally", push refused
-  |   pass
+  pre-push hook, Gate 1: gitleaks, OSV-Scanner, Semgrep
+  |   any finding: all three reported, push refused
+  |   clean
   v
                                        pull request opened, assigned to author
                                          |
+                                         +-- secret-scan (gitleaks)    required check
                                          +-- scan (Semgrep)            required check
                                          +-- dependency-review         required check
-                                         +-- triage step (always runs)
+                                         +-- triage step (always runs, after secret-scan)
                                                |
-                                               new pins  -> GitHub Advisory Database -> CVE, CVSS 3.1 and 4.0
-                                               SARIF     -> CWE -> .cra/cwe-vectors.json -> CVSS 3.1
+                                               new pins       -> GitHub Advisory Database -> CVE, CVSS 3.1 and 4.0
+                                               Semgrep SARIF  -> CWE -> .cra/cwe-vectors.json -> CVSS 3.1
+                                               gitleaks SARIF -> CWE-798 -> .cra/cwe-vectors.json -> CVSS 3.1
                                                |
                                                score -> P1..P4 -> one issue per finding, assigned to author
                                                table with score, priority and issue link commented on the PR
@@ -71,6 +73,13 @@ with the CVSS 3.1 formula in [`triage/cvss.py`](triage/cvss.py). The issue
 states that the score is assessed from the vector, not published, so the
 record is honest about its provenance.
 
+**Secrets.** gitleaks reports a rule id such as `aws-access-token`, never a
+weakness id, and every committed credential is the same weakness class. So a
+gitleaks finding is scored as CWE-798, Hard-coded Credentials, from the same
+table, and its issue tells the developer to rotate the credential and rewrite
+the branch. When Semgrep's generic secrets rules flag the same file, only the
+gitleaks finding is kept: one secret, one issue.
+
 A test asserts that every row's stated score is what its vector computes to,
 so the table cannot drift. A finding whose CWE is not in the table gets the
 `needs-scoring` label and no priority, never a guessed number. Adding the
@@ -82,6 +91,7 @@ The issue key is the identity of the finding, not where it was seen:
 
 - dependency: package and advisory id, `dep:pyyaml:GHSA-8q59-q68h-6hv4`
 - code: rule and file, `code:<rule id>:<path>`
+- secret: gitleaks rule and file, `code:aws-access-token:<path>`
 
 So the same CVE seen on a pull request and later as a Dependabot alert on main
 is one issue, and a package with three advisories gets three issues, each with
@@ -143,8 +153,8 @@ the repository.
 1. Copy `triage/`, `.cra/`, `scripts/hooks/`, `scripts/install-hooks.sh` and
    the two workflow files.
 2. Set the repository variable `TRIAGE_DEFAULT_ASSIGNEE`.
-3. Add `dependency-review` to the required status checks in the live ruleset,
-   next to `scan`. The JSON in `.github/rulesets/` is the documented shape;
+3. Add `dependency-review` and `secret-scan` to the required status checks in
+   the live ruleset, next to `scan`. The JSON in `.github/rulesets/` is the documented shape;
    the enforcing copy lives in repository settings and does not read the file.
 4. Every developer runs `scripts/install-hooks.sh` once per clone.
 
@@ -154,4 +164,5 @@ The scoring, chart, rendering, client and lifecycle logic are unit tested:
 `python -m pytest tests`. The end to end path is proven by planting a
 finding on a branch and opening a pull request; the checks go red, the issue
 appears, the table lands on the pull request. The pre-push hook is proven by
-planting a finding locally and watching the push refuse.
+planting a finding locally and watching the push refuse. The record of the
+last full run is in [GATE_TEST.md](GATE_TEST.md).

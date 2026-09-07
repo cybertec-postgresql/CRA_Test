@@ -28,13 +28,27 @@ while read -r local_ref local_sha remote_ref remote_sha; do
     REVS="$REVS $local_sha"
 done
 [ -z "$REVS" ] && exit 0
-LOG_OPTS="$REVS --not --remotes=origin"
+LOG_OPTS="${REVS# } --not --remotes=origin"
+
+# gitleaks exits 0 when git itself fails, which would pass a broken range.
+# Enumerate the range here first: a failure refuses the push, an empty range
+# means every commit is already on origin and there is nothing to scan.
+# shellcheck disable=SC2086
+if ! NEW_COMMITS=$(git rev-list --count $LOG_OPTS 2>&1); then
+    echo "Gate 1 could not enumerate the commits being pushed: $NEW_COMMITS" >&2
+    exit 1
+fi
 
 # Containers run as root and git refuses a repository owned by another user
 # unless it is marked safe. These three variables do that for the mount only.
 GIT_SAFE="-e GIT_CONFIG_COUNT=1 -e GIT_CONFIG_KEY_0=safe.directory -e GIT_CONFIG_VALUE_0=/repo"
 
 run_secrets() {
+    if [ "$NEW_COMMITS" -eq 0 ]; then
+        echo "every commit is already on origin, nothing new to scan"
+        return 0
+    fi
+    echo "$NEW_COMMITS new commit(s) to scan"
     if command -v gitleaks >/dev/null 2>&1; then
         gitleaks git . --log-opts="$LOG_OPTS" --redact --no-banner --exit-code 1
     else
@@ -47,9 +61,9 @@ run_secrets() {
 run_packages() {
     [ -f "$MANIFEST" ] || { echo "no $MANIFEST, nothing to check"; return 0; }
     if command -v osv-scanner >/dev/null 2>&1; then
-        osv-scanner scan source -L "$MANIFEST"
+        osv-scanner scan source --no-resolve -L "$MANIFEST"
     else
-        docker run --rm -v "$PWD:/src" -w /src "$OSV_IMAGE" scan source -L "$MANIFEST"
+        docker run --rm -v "$PWD:/src" -w /src "$OSV_IMAGE" scan source --no-resolve -L "$MANIFEST"
     fi
 }
 

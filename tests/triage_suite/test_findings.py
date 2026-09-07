@@ -135,3 +135,48 @@ def test_gitleaks_code_scanning_alert_shares_the_pr_key_and_score():
     assert f.key == "code:aws-access-token:app/config.py"
     assert f.cwes == ["CWE-798"] and f.cvss31_score == 7.5 and f.priority == "P2"
     assert f.rule_url is None
+
+
+def test_a_secret_seen_by_both_scanners_is_one_finding():
+    # Semgrep's generic secrets rules flag the same line gitleaks does. One
+    # problem must become one issue, and gitleaks is the tool of record.
+    import copy
+    from .fixtures import SARIF_GITLEAKS
+    semgrep = copy.deepcopy(SARIF_CERT_VALIDATION)
+    semgrep["runs"][0]["tool"]["driver"]["rules"].append({
+        "id": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+        "helpUri": "https://semgrep.dev/r/generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+        "defaultConfiguration": {"level": "error"},
+        "properties": {"tags": ["CWE-798: Use of Hard-coded Credentials", "security"]},
+    })
+    semgrep["runs"][0]["results"].append({
+        "ruleId": "generic.secrets.security.detected-aws-access-key-id-value.detected-aws-access-key-id-value",
+        "level": "error",
+        "message": {"text": "AWS Access Key ID Value detected."},
+        "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app/config.py"}, "region": {"startLine": 3}}}],
+    })
+    table = load_table()
+    found = F.findings_from_sarif(semgrep, table, ORIGIN) + F.findings_from_sarif(SARIF_GITLEAKS, table, ORIGIN)
+    assert len(found) == 4
+    kept = F.dedupe_secrets(found)
+    assert [f.key for f in kept] == [
+        "code:python.requests.security.disabled-cert-validation.disabled-cert-validation:app/upstream.py",
+        "code:python.lang.best-practice.unknown-thing:app/x.py",
+        "code:aws-access-token:app/config.py",
+    ]
+
+
+def test_dedupe_keeps_a_semgrep_secret_finding_when_gitleaks_did_not_see_the_file():
+    import copy
+    semgrep = copy.deepcopy(SARIF_CERT_VALIDATION)
+    semgrep["runs"][0]["tool"]["driver"]["rules"].append({
+        "id": "generic.secrets.security.detected-generic-secret",
+        "properties": {"tags": ["CWE-798: Use of Hard-coded Credentials"]},
+    })
+    semgrep["runs"][0]["results"].append({
+        "ruleId": "generic.secrets.security.detected-generic-secret",
+        "message": {"text": "x"},
+        "locations": [{"physicalLocation": {"artifactLocation": {"uri": "app/other.py"}, "region": {"startLine": 9}}}],
+    })
+    found = F.findings_from_sarif(semgrep, load_table(), ORIGIN)
+    assert len(F.dedupe_secrets(found)) == 3

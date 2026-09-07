@@ -245,3 +245,19 @@ def finding_from_code_scanning_alert(alert: dict, table: dict) -> Finding:
     f.dismissed_by = (alert.get("dismissed_by") or {}).get("login")
     f.dismissed_comment = alert.get("dismissed_comment")
     return f
+
+
+def dedupe_secrets(findings: list) -> list:
+    """One committed secret, one issue. Semgrep's generic secrets rules flag the
+    same line gitleaks does; when both saw a file, gitleaks is the tool of record
+    and the Semgrep CWE-798 finding on that file is dropped."""
+    seen_by_gitleaks = {f.location[0] for f in findings if f.tool == "gitleaks" and f.location}
+    out = []
+    for f in findings:
+        duplicate = (
+            f.tool == "semgrep" and f.primary_cwe == "CWE-798"
+            and f.location and f.location[0] in seen_by_gitleaks
+        )
+        if not duplicate:
+            out.append(f)
+    return out
