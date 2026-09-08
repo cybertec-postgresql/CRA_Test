@@ -4,8 +4,11 @@ Every security finding in this repository ends up as one GitHub issue that
 carries the CVE, the CVSS score and vector, the fix version, a link to where it
 was found and a P1 to P4 priority. The issue is assigned to the developer who
 introduced the finding. This file explains the pipeline, the scoring and the
-decisions behind both. The code is in [`triage/`](triage/), the tests in
-[`tests/triage_suite/`](tests/triage_suite/).
+decisions behind both. The code and its tests live in the shared repository
+[cybertec-postgresql/cra-gates](https://github.com/cybertec-postgresql/cra-gates)
+(`triage/`, `tests/`); the workflows here fetch them at the commit pinned in
+`.github/workflows/`. This repository keeps no copy of its own, on purpose:
+a stale copy shadowed the shared code for 76 scheduled runs.
 
 ## The flow
 
@@ -69,7 +72,7 @@ formula. NVD analysts produce every published score the same way: assign a
 vector from the weakness and its context, compute the base score. We do the
 same. [`.cra/cwe-vectors.json`](.cra/cwe-vectors.json) holds one reviewed
 vector per weakness class with a rationale, and the score is computed from it
-with the CVSS 3.1 formula in [`triage/cvss.py`](triage/cvss.py). The issue
+with the CVSS 3.1 formula in `triage/cvss.py` in cra-gates. The issue
 states that the score is assessed from the vector, not published, so the
 record is honest about its provenance.
 
@@ -144,24 +147,24 @@ workflow at the check step with the offending item named.
 | Vector table row | stated score equals the score its vector computes to | The score on an issue must be reproducible from the vector printed next to it. |
 | Vector table row | has `name`, `vector`, `score`, `rationale` | The rationale is the review record for the vector. |
 
-Labels are defined in one place, `triage/priority.py`. Change them there, run
+Labels are defined in one place, `triage/priority.py` in cra-gates. Change them there, run
 the tests, and the check step confirms the result before the workflow touches
 the repository.
 
 ## Setup on a new repository
 
-1. Copy `triage/`, `.cra/`, `scripts/hooks/`, `scripts/install-hooks.sh` and
-   the two workflow files.
-2. Set the repository variable `TRIAGE_DEFAULT_ASSIGNEE`.
-3. Add `dependency-review` and `secret-scan` to the required status checks in
-   the live ruleset, next to `scan`. The JSON in `.github/rulesets/` is the documented shape;
-   the enforcing copy lives in repository settings and does not read the file.
-4. Every developer runs `scripts/install-hooks.sh` once per clone.
+The shared repository's README is the rollout guide. In short: copy the two
+files from `cra-gates/caller/` into `.github/workflows/`, pin both to a full
+cra-gates commit id, set the repository variable `TRIAGE_DEFAULT_ASSIGNEE` and
+the `TRIAGE_TOKEN` secret, apply the matching ruleset from `cra-gates/rulesets/`,
+and every developer installs the hook once per laptop with
+`cra-gates/install.sh`. Do not copy `triage/` or `.cra/` into the repository:
+Python would import that copy instead of the shared one.
 
 ## Testing it
 
-The scoring, chart, rendering, client and lifecycle logic are unit tested:
-`python -m pytest tests`. The end to end path is proven by planting a
+The scoring, chart, rendering, client and lifecycle logic are unit tested in
+cra-gates: `python -m pytest tests` there. The end to end path is proven by planting a
 finding on a branch and opening a pull request; the checks go red, the issue
 appears, the table lands on the pull request. The pre-push hook is proven by
 planting a finding locally and watching the push refuse. The record of the
