@@ -15,7 +15,7 @@ Do not open a public issue for a vulnerability.
 
 Use "Report a vulnerability" under the Security tab of this repository, which
 opens a private report that only maintainers can read. If you cannot use
-GitHub, write to <security mailbox>.
+GitHub, write to security@cybertec.at.
 
 What to include: the affected file, version or commit, steps to reproduce,
 and the impact you believe it has. A proof of concept helps; live
@@ -49,5 +49,5 @@ the vulnerability is being exploited or is already public.
 
 Evidence that a vulnerability is being exploited starts the organisation's
 Cyber Resilience Act notification process, which is handled by
-<security group name> and is separate from the timelines above. Report such
+the Cybertec security team (security@cybertec.at) and is separate from the timelines above. Report such
 evidence the same way and say so in the first line.
