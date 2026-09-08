@@ -34,7 +34,7 @@ git push
                                          |
                                        merge blocked until both checks pass and a reviewer approves
 
-                                       default branch, every 15 minutes
+                                       default branch, once a day (05:23 UTC) or by hand
                                          Dependabot alerts + code scanning alerts
                                            -> same scoring, same issues
                                            -> fixed or dismissed alert closes the issue with the reason
@@ -124,7 +124,7 @@ cannot be assigned to a team.
 
 Dependabot alerts fire a webhook but cannot start a workflow. The options were
 a scheduled poll or an external webhook receiver. The poll is inside GitHub,
-free on a public repository, and has a worst case latency of 15 minutes. A
+free on a public repository, and runs once a day; the Actions tab runs it by hand when sooner is needed. A
 receiver is real time but is one more thing to host and keep alive. Both run
 the same script, so moving to a receiver later is a trigger change, not a
 rewrite. Note that GitHub disables scheduled workflows in a public repository
