@@ -15,6 +15,6 @@ permissions:
 
 jobs:
   gates:
-    uses: cybertec-postgresql/cra-gates/.github/workflows/gates.yml@3c49d6fb76a20ecd16aed5a9fe0214d9a2c6b8df
+    uses: cybertec-postgresql/cra-gates/.github/workflows/gates.yml@aa61601eb39067f089913f326372247202e2bea4
     with:
       private: false

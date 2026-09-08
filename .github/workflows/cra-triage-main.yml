@@ -1,5 +1,5 @@
 # Copy to .github/workflows/cra-triage-main.yml in each repository. Polls the
-# default branch's alerts every 15 minutes and mirrors them to issues, using
+# default branch's alerts once a day and mirrors them to issues, using
 # the triage code from cra-gates. Dependabot alerts need a token with the
 # Dependabot alerts permission: add a fine grained token as the TRIAGE_TOKEN
 # secret (Dependabot alerts: read, Issues: write). Without it the run still
@@ -8,7 +8,7 @@ name: cra-triage-main
 
 on:
   schedule:
-    - cron: "*/15 * * * *"
+    - cron: "23 5 * * *"
   workflow_dispatch:
 
 permissions:
@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: cybertec-postgresql/cra-gates
-          ref: 3c49d6fb76a20ecd16aed5a9fe0214d9a2c6b8df
+          ref: aa61601eb39067f089913f326372247202e2bea4
           path: .cra-gates
 
       - name: Check triage configuration
