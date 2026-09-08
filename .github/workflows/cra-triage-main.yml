@@ -32,7 +32,7 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: cybertec-postgresql/cra-gates
-          ref: fc3ff8bf7f64f43a6e9b304307884374fdc64108
+          ref: 9845b5e227e276ac60d06fd7df8e6c1572905432
           path: .cra-gates
 
       # PYTHONSAFEPATH keeps this repository's own directory off the import
