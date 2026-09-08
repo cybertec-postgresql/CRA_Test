@@ -32,14 +32,19 @@ jobs:
         uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
           repository: cybertec-postgresql/cra-gates
-          ref: aa61601eb39067f089913f326372247202e2bea4
+          ref: fc3ff8bf7f64f43a6e9b304307884374fdc64108
           path: .cra-gates
 
+      # PYTHONSAFEPATH keeps this repository's own directory off the import
+      # path, so a stale triage/ folder here cannot shadow the cra-gates code.
       - name: Check triage configuration
+        env:
+          PYTHONSAFEPATH: "1"
         run: PYTHONPATH=.cra-gates python3 -m triage check
 
       - name: Reconcile alerts with issues
         env:
+          PYTHONSAFEPATH: "1"
           GITHUB_TOKEN: ${{ secrets.TRIAGE_TOKEN || secrets.GITHUB_TOKEN }}
           TRIAGE_DEFAULT_ASSIGNEE: ${{ vars.TRIAGE_DEFAULT_ASSIGNEE }}
         run: PYTHONPATH=.cra-gates python3 -m triage main --repo-dir .
